@@ -30,9 +30,13 @@ Prerequisites
 * For convenience, put the script in a location in your $PATH. Or add it´s location to $PATH.
 
 After customizing the *VMWARE_IMAGE*, *FS_MOUNTPOINT* and possibly the *VMRUN* variables in the script, making it executable:
+
 `$ [sudo] chmod +x vmware-fs-ctl.sh`
+
 the script should be usable:
+
 `$ sudo vmware-fs-ctl.sh {start|stop|restart|status}`
+
 To begin with, try out status with the VM turned off to se it is running without errors.
 
 
