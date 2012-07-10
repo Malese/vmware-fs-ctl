@@ -3,7 +3,7 @@ vmware-fs-ctl
 
 Summary
 -------
-vmware-fs-ctl.sh is a start|stop|restart|status shell script for running a headless OS in VmWare Fusion on OSx and handle  mounting/unmounting of the OS´s root filesystem exported via NFS.
+vmware-fs-ctl.sh is a start|stop|restart|status shell script for running a headless OS in VmWare Fusion on OSx and handle  mounting/unmounting of the OS´s root filesystem exported via NFS. BSD licensed.
 
 It might work well on other \*nix systems whith small modifications. In that case, be sure to at least set the *VMRUN* config variable pointing out the location of the vmrun executable.
 
