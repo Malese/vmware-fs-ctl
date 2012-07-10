@@ -14,6 +14,7 @@ Goals:
 * Run the VF/VM headless. which get VF out of the way and makes it more smooth to operate on it via command line.
 * Mount the virtual machine´s filesytem to a local mountpoint.
 * Speed up start, stop, restart, mount and unmount.
+
 vmware-fs-ctl.sh handles all this.
 
 
