@@ -20,10 +20,10 @@ vmware-fs-ctl.sh handles all this.
 
 Prerequisites
 -------------
-* Have VmWare Fusion onstalled on OSx and a virtual machine to run.
+* Have VmWare Fusion installed on OSx and a virtual machine to run.
 * Turn off superflous features in VM settings for the VM you want to run headless that aren't needed like Accelerate 3D Graphics. Do not have headless Virtual Machines automatically connect to or be connected to unneeded devices.
 * Have the VM you want to run headless set up and run normaly via VmWare library GUI and try to permanently take care of any dialog boxes tha pops up. Also put *msg.autoAnswer = "TRUE"* in the VM´s .vmx-file. That will try to autoanswer any dialogs.
-* When running headless you need SSH or similar to be able to communicate with and controll the VM. If in trouble, the vmrun utillity has a lot up it´s sleave to handle the VM.
+* When running headless you need SSH or similar to be able to communicate with and controll the VM since the VF GUI will not be invilved. If in trouble, the vmrun utillity has a lot up it´s sleave to handle the VM.
 * Shutdown VM.
 * Delete the VM from VmWare´s library GUI, but be sure to keep the file. It´s ok to move it in and out of there later on, at least when not running.
 * Quit VmWare
