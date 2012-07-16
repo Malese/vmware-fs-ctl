@@ -1,10 +1,12 @@
 #!/bin/bash
 
-# This is a start|stop|restart|status script for running a headless OS in VmWare Fusion on OSx.
+# This is a start|stop|restart|status bash script for running a headless OS in VmWare Fusion on OSx.
 # It will also handle mounting/unmounting of the OS´s root filesystem.
+# On first run, it will create a directory and a history and error log-file.
 #
 # It might work well on other *nix systems whith small modifications. Be sure to 
 # check location of vmrun executable at least.
+# Currently not POSIX-compatible due to [[ .. ]] tests for example.
 #
 # vmrun manual http://www.vmware.com/pdf/vix180_vmrun_command.pdf
 # Related tips http://communities.vmware.com/message/1648085
@@ -15,166 +17,190 @@
 
 
 # ------------------------------------------------------------
-# Setup Environment
+# Setup Environment, make your changes here.
 # ------------------------------------------------------------
-# Where are the VmWare image located?
+# Where are the VmWare image located? .vmx-file or similar.
 readonly VMWARE_IMAGE="/Users/martin/Virtual-machines/testserver.vmwarevm/testserver.vmx"
 # What local mountpoint to use for the OS´s root filesystem?
 readonly FS_MOUNTPOINT="/Users/martin/Volumes/deveditor"
 # Location of vmrun executable should not need alteration on standard OSx VmWare Fusion install,
 # but check location of vmrun in case your system varies from that.
 readonly VMRUN="/Library/Application Support/VMware Fusion/vmrun"
+# Log files. Changes are optional.
+# A directory $LOG_IN_DIR/vmware-fs-ctl will be created.
+readonly LOG_IN_DIR="/var/log"
 
 
 # ------------------------------------------------------------
 # Internal defaults
 # ------------------------------------------------------------
-ROUTE=$1
-RUNNING_IMAGES=`sudo "$VMRUN" -T ws list`
-VM_RUNNING=0
-FS_MOUNTED=0
+ROUTE=
+QUIET=0
+LOG_DIR=$LOG_IN_DIR/vmware-fs-ctl
 
 
-# Sets the two variables $VM_RUNNING and $FS_MOUNTED that
-# indicates wheather guest OS is running an if its fs is mounted
-status() {
-    # Check to see if $VMWARE_IMAGE is in the list of running images.
-    if [[ "$RUNNING_IMAGES" =~ "$VMWARE_IMAGE" ]]
+validateArgs() {
+    for p in "$@"
+    do
+        case $p in
+            "start")
+                ROUTE=$p
+            ;;
+            "stop")
+                ROUTE=$p
+            ;;
+            "restart")
+                ROUTE=$p
+            ;;
+            "status")
+                ROUTE=$p
+            ;;
+            "q")
+                QUIET=1
+            ;;
+        esac
+    done
+}
+
+init() {
+    # Create log-dir if not already there
+    [[ ! -d $LOG_DIR ]] && mkdir $LOG_DIR
+    # Create log-files if not already there
+    if [[ -d $LOG_DIR ]]
     then
-        VM_RUNNING=1
-        #  Check to see if fs is also mounted?
-        MOUNTED=`mount`
-        if [[ "$MOUNTED" =~ "$FS_MOUNTPOINT" ]]
-        then
-            FS_MOUNTED=1
-        fi
+        [[ ! -f $LOG_DIR/history.log ]] && { touch $LOG_DIR/history.log; message "Creating history-logfile. This message should reside in file $LOG_DIR/history.log if all went well."; }
+        [[ ! -f $LOG_DIR/error.log ]] && { touch $LOG_DIR/error.log; message "Creating error-logfile. There should now be a file $LOG_DIR/error.log if all went well."; }
+    else
+        echo "Error: Could not create log-files directory $LOG_DIR. Permissions?"
+        exit
     fi
+}
+
+# Output to stdout and history-log.
+message() {
+    [ $QUIET -eq 0 ] && echo $1
+    echo $(date) $1 >> $LOG_DIR/history.log
 }
 
 # Starts the guest OS and if sucessfull,
 # proceeds to mounting routine.
 runGuest() {
     # If image is not already running.
-    if [[ "$VM_RUNNING" == 0 ]]
-    then
-        echo "STARTING GUEST OS: In progress ..."
+    "$VMRUN" -T ws list|grep -q "$VMWARE_IMAGE"
+    if [ $? -eq 0 ]
+    then  
+        # Image is running since before, go to mount.
+        message "STARTING GUEST OS: Already running, going to mount ..."
+        mountFs
+    else
+        message "STARTING GUEST OS: In progress ..."
         # Actual start command using vmrun
-        "$VMRUN" -T fusion start "$VMWARE_IMAGE" nogui
+        # Errors from vmrun goes to STDOUT instead of STDERR, and successfull
+        # operation does not give output, so every return message goes to error.log
+        "$VMRUN" -T fusion start "$VMWARE_IMAGE" nogui 2>&1> $LOG_DIR/error.log
         # Now we will probe vmware to see if the image got to a start,
         # but before that, give vmware some gracetime to be able to initialize.
         # Have never seen a successful start actually being missed by the "list"-command
-        # som a "sleep" might not even be needed.
+        # so a "sleep" might not even be necessary.
         sleep 1s
-        RUNNING_IMAGES=`"$VMRUN" -T ws list`
-        if [[ "$RUNNING_IMAGES" =~ "$VMWARE_IMAGE" ]]
+        "$VMRUN" -T ws list|grep -q "$VMWARE_IMAGE"
+        if [ $? -eq 0 ]
         then
-            VM_RUNNING=1
-            echo "STARTING GUEST OS: Success."
+            message "STARTING GUEST OS: Success."
             mountFs
-        else
-            echo "STARTING GUEST OS: Failed!"
+        else      
+            message "STARTING GUEST OS: Failed! see $LOG_DIR/error.log"
         fi
-    # Image is running since before, go to mount.
-    else
-        echo "STARTING GUEST OS: Already running, going to mount ..."
-        mountFs
     fi
 }
 
 # Starts by calling unmount routine then stops guest OS.
 stopGuest() {
-    unMountFs
-    echo "STOPPING GUEST OS: ..."
-    if [[ "$VM_RUNNING" == 1 ]]
+    "$VMRUN" -T ws list|grep -q "$VMWARE_IMAGE"
+    if [ $? -eq 0 ]
     then
-        STOP_RESULT=`"$VMRUN" -T fusion stop "$VMWARE_IMAGE"`
-        if [[ $STOP_RESULT -eq 0 ]]
+        unMountFs
+        message "STOPPING GUEST OS: ..."
+        "$VMRUN" -T fusion stop "$VMWARE_IMAGE" 2>&1> $LOG_DIR/error.log
+        if [ $? -eq 0 ]
         then
-            VM_RUNNING=0
-            echo "STOPPING GUEST OS: Success."
+            message "STOPPING GUEST OS: Success."
         else
-            echo "STOPPING GUEST OS: Opps, something vent wrong when halting."
+            message "STOPPING GUEST OS: Failed! see $LOG_DIR/error.log"
         fi
     else
-        echo "STOPPING GUEST OS: Guest OS is not running."
+        message "STOPPING GUEST OS: Guest OS is not running."
     fi
 }
 
 # Trying to mount the guest OS fs at $FS_MOUNTPOINT
 # Only to be run by 'runGuest'
 mountFs() {
-    # First check if vm is running.
-    if [[ "$VM_RUNNING" == 1 ]]
+    # Check if is already mounted
+    mount|grep -q "$FS_MOUNTPOINT"
+    if [ $? -eq 0 ]
     then
-        # Then check if is already mounted
-        if [[ "$FS_MOUNTED" == 0 ]]
+        message "MOUNT: Already mounted."
+    else    
+        # If not, try mounting.
+        message "MOUNT: In progress. This might take some time if OS is starting up."
+        mount -t nfs -o hard,intr -o -P deveditor:/ "$FS_MOUNTPOINT" 2> $LOG_DIR/error.log
+        if [ $? -eq 0 ]
         then
-            # If not, try mounting.
-            echo "MOUNT: In progress. This might take some time if OS is starting up."
-            MOUNT_RESULT=`sudo mount -t nfs -o hard,intr -o -P deveditor:/ "$FS_MOUNTPOINT"`
-            if [[ $MOUNT_RESULT -eq 0 ]]
-            then
-                FS_MOUNTED=1
-                echo "MOUNT: Success. mountpoint: $FS_MOUNTPOINT"
-            else
-                echo "MOUNT: Opps, something vent wrong."
-            fi
+            message "MOUNT: Success. mountpoint: $FS_MOUNTPOINT"
         else
-            echo "MOUNT: Already mounted."
+            message "MOUNT: Error mounting, see $LOG_DIR/error.log"
         fi
-    else
-        echo "MOUNT: Not mounted, guest OS is not running."
     fi
 }
 
 # Trying to unmount the guest OS fs from $FS_MOUNTPOINT
 # Only to be run by 'stopGuest'
 unMountFs() {
-    # First check if vm is running.
-    if [[ "$VM_RUNNING" == 1 ]]
+    # Check if fs is actually mounted.
+    mount|grep -q "$FS_MOUNTPOINT"
+    if [ $? -eq 0 ]
     then
-        # Then check if fs is actually mounted.
-        if [[ "$FS_MOUNTED" == 0 ]]
+        message "UNMOUNT: In progress ..."
+        umount -f "$FS_MOUNTPOINT" 2> $LOG_DIR/error.log
+        if [ $? -eq 0 ]
         then
-            echo "UNMOUNT: In progress ..."
-            UNMOUNT_RESULT=`sudo umount -f "$FS_MOUNTPOINT"`
-            if [[ $UNMOUNT_RESULT -eq 0 ]]
-            then
-                FS_MOUNTED=0
-                echo "UNMOUNT: Success"
-            # else
-                # Skipping output, umount will output a gracefull errormessage by itself.
-                # echo "UNMOUNT: Opps, something vent wrong when unmounting."
-            fi
+            message "UNMOUNT: Success"
         else
-            echo "UNMOUNT: Fs not mounted"
+            message "UNMOUNT: Error unmounting, see $LOG_DIR/error.log"
         fi
     else
-        echo "UNMOUNT: Guest OS not running."
+        message "UNMOUNT: Fs was not mounted"
     fi
 }
 
 # Prints out the result of "status" in a readable maner.
 echoStatus() {
     # OS running?
-    if [[ "$VM_RUNNING" == 1 ]]
+    "$VMRUN" -T ws list|grep -q "$VMWARE_IMAGE"
+    if [ $? -eq 0 ]
     then
-        echo "Guest OS is running. ($VMWARE_IMAGE)"
+        message "Guest OS is running. ($VMWARE_IMAGE)"
     else
-        echo "Guest OS is NOT running. (missleading if not run via sudo)"
+        message "Guest OS is NOT running. (missleading if not run via sudo)"
     fi
     # Mounted?
-    if [[ "$FS_MOUNTED" == 1 ]]
+    mount|grep -q "$FS_MOUNTPOINT"
+    if [ $? -eq 0 ]
     then
-        echo "Guest OS filesystem mounted. ($FS_MOUNTPOINT)"
-    else
-        echo "Guest OS filesystem is NOT mounted. (missleading if not run via sudo)"
+        message "Guest OS filesystem mounted. ($FS_MOUNTPOINT)"
+    else      
+        message "Guest OS filesystem is NOT mounted. (missleading if not run via sudo)"
     fi
 }
 
 
-# First of all, determine status
-status
+# Parse arguments
+validateArgs $@
+
+# Create logfiles if they dont already exists.
+init
+
 
 case $ROUTE in
     "start")
@@ -190,8 +216,7 @@ case $ROUTE in
     "status")
         echoStatus
     ;;
-
     *)
-        echo "Usage: [sudo] start-fusion-dev {start|stop|restart|status}"
+        message "Usage: sudo start-fusion-dev {start|stop|restart|status} [q]"
     ;;
 esac

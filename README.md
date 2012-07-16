@@ -3,17 +3,15 @@ vmware-fs-ctl
 
 Summary
 -------
-vmware-fs-ctl.sh is a start|stop|restart|status shell script for running a headless OS in VmWare Fusion on OSx and handle  mounting/unmounting of the OS´s root filesystem exported via NFS. BSD licensed.
+vmware-fs-ctl.sh is a start|stop|restart|status shell script for running a headless OS in VmWare Fusion on OSx and handle mounting/unmounting of the OS´s filesystem exported via NFS. BSD licensed.
 
-It might work well on other \*nix systems whith small modifications. In that case, be sure to at least set the *VMRUN* config variable pointing out the location of the vmrun executable.
+It might work well on other \*nix systems and/or VmWare-versions whith small modifications. In that case, be sure to at least set the *VMRUN* config variable pointing out the location of the vmrun executable.
 
-About
+Goals
 -----
-Goals:
-* Run virtual machine (VM) in a local install of VmWare Fusion (VF) on OSx.
-* Run the VF/VM headless. which get VF out of the way and makes it more smooth to operate on it via command line.
+* Run virtual machine (VM) headless in a local install of VmWare Fusion (VF) on OSx which get VF out of the way and makes it more smooth to operate on via command line.
 * Mount the virtual machine´s filesytem to a local mountpoint.
-* Speed up start, stop, restart, mount and unmount.
+* Speed up start, stop, restart, mount and unmount and checking status.
 
 vmware-fs-ctl.sh handles all this.
 
@@ -31,7 +29,7 @@ Prerequisites
 * Test the headless mode in Terminal using: *"/Library/Application Support/VMware Fusion/vmrun" -T fusion start "/absolute/path/to/your/image.vmx" nogui*
 * For convenience, put the script in a location in your $PATH. Or add it´s location to $PATH.
 
-After customizing the *VMWARE_IMAGE*, *FS_MOUNTPOINT* and possibly the *VMRUN* variables in the script, making it executable:
+After customizing the *VMWARE_IMAGE*, *FS_MOUNTPOINT* and possibly the *VMRUN* variables in the script, and making it executable:
 
 `$ [sudo] chmod +x vmware-fs-ctl.sh`
 
@@ -39,7 +37,7 @@ the script should be usable:
 
 `$ sudo vmware-fs-ctl.sh {start|stop|restart|status}`
 
-To begin with, try out status with the VM turned off to se it is running without errors.
+To begin with, try out status with the VM turned off to se it is running without errors. On first run it will create a directory and a history and error log-file.
 
 
 
